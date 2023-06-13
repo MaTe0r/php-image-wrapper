@@ -42,6 +42,8 @@ class Img extends Imagick
             throw new Exception("create imagick instance failed");
         }
 
+        # set filename
+        $image->setFilename($file['name']);
         return $image;
     }
 
@@ -64,8 +66,8 @@ class Img extends Imagick
         }
 
         # check mime type
-        if (!in_array($image->getImageMimeType(), static::$allowed_mime)) {
-            throw new Exception("mime type is not image: ".$imagick->getImageMimeType());
+        if (!in_array($image->getMimeType(), static::$allowed_mime)) {
+            throw new Exception("mime type is not image: ".$image->getMimeType());
         }
 
         return $image;
@@ -161,33 +163,30 @@ class Img extends Imagick
     public function save(string $filepathname)
     {
         if (!$filepath = dirname($filepathname)) {
-            throw new Exception('filepath directory is empty: '.$filepath);
+            throw new Exception('filepath directory name is invalid: '.$filepath);
         }
         
-        if (!is_dir($filepath)) {
+        if (!is_dir($filepath) && !mkdir($filepath, 0755, true)) {
             throw new Exception('filepath directory is not a directory: '.$filepath);
-        }
-
-        # check filepath exists or try to create it
-        if(!mkdir($filepath, 0755, true)) {
-            return false;
         }
 
         return $this->writeImage($filepathname);
     }
 
 
-    public function resize(int $width, int $height)
+    public function resize(int $width = 0, int $height = 0)
     {
-        return $this->resizeImage($width, $height, 0, 1, false);
+        $this->resizeImage($width, $height, 0, 1, false);
+        return $this;
     }
 
 
-    public function crop(int $width, int $height)
+    public function crop(int $width = 0, int $height = 0)
     {
         $offset_x = $this->getWidth() / $width;
         $offset_y = $this->getHeight() / $height;
         $offset_x <= $offset_y ? $this->resizeImage($width, 0, 0, 1) : $this->resizeImage(0, $height, 0, 1);
-        return $this->cropImage($width, $height, (int)(abs($this->getWidth() - $width) / 2), (int)(abs($this->getHeight() - $height) / 2));
+        $this->cropImage($width, $height, (int)(abs($this->getWidth() - $width) / 2), (int)(abs($this->getHeight() - $height) / 2));
+        return $this;
     }
 }
