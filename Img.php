@@ -1,70 +1,74 @@
 <?php
 
-class Img
+class Img extends Imagick
 {
-    public static $allowed_extensions = array("jpg", "jpeg", "png", "gif", "webp");
-    public static $allowed_mime = array('image/jpeg', 'image/png', 'image/webp', 'image/x-webp');
-    private $_imagick;
-    public $path;
+    public static $allowed_extensions = [
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "webp"
+    ];
 
 
+    public static $allowed_mime = [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'image/x-webp'
+    ];
+
+    
     public static function loadFromHTTP(array $file)
     {
         # check array fields of $_FILES var
-        if (!isset ($file['name'], $file['size'], $file['type'], $file['tmp_name'])) {
-            throw new Exception("Missing field in HTTP _FILES");
+        if (!isset($file['name'], $file['size'], $file['type'], $file['tmp_name'])) {
+            throw new Exception("file send via HTTP request is not valid");
         }
 
         # get and check extension
         $extension = strtolower(substr($file['name'], strrpos($file['name'], '.') + 1));
         if (!in_array($extension, static::$allowed_extensions)) {
-            throw new Exception("extension is not image: ".$extension);
+            throw new Exception("extension is not an image: ".$extension);
         }
 
         # check mime type
         if (!in_array($file['type'], static::$allowed_mime)) {
-            throw new Exception("mime type is not image: ".$file['type']);
+            throw new Exception("mime type is not an image: ".$file['type']);
         }
 
         # create imagick object
-        if (!$imagick = new Imagick($file['tmp_name'])) {
+        if (!$image = new static($file['tmp_name'])) {
             throw new Exception("create imagick instance failed");
         }
 
-        # return img object
-        $img = new static();
-        $img->_imagick = $imagick;
-        return $img;
+        return $image;
     }
 
 
     public static function loadFromPath(string $path)
     {
-        # check array fields of $_FILES var
+        # check path is a file
         if (!is_file($path)) {
             throw new Exception("path is not a file: ".$path);
         }
 
         # check imagick is ok
-        if (!$imagick = new Imagick(realpath($path))) {
+        if (!$image = new static(realpath($path))) {
             throw new Exception("invalid imagick path");
         }
 
         # get and check extension
-        if (!in_array(strtolower($imagick->getImageFormat()), static::$allowed_extensions)) {
-            throw new Exception("extension is not image: ".strtolower($imagick->getImageFormat()));
+        if (!in_array($image->getExtension(), static::$allowed_extensions)) {
+            throw new Exception("extension is not image: ".$image->getExtension());
         }
 
         # check mime type
-        if (!in_array($imagick->getImageMimeType(), static::$allowed_mime)) {
+        if (!in_array($image->getImageMimeType(), static::$allowed_mime)) {
             throw new Exception("mime type is not image: ".$imagick->getImageMimeType());
         }
 
-        # return img object
-        $img = new static();
-        $img->_imagick = $imagick;
-        $img->path = $path;
-        return $img;
+        return $image;
     }
 
 
@@ -72,7 +76,7 @@ class Img
     {
         # check array fields of $_FILES var
         if (!$content = file_get_contents($url)) {
-            throw new Exception("url content is invalid: ".$url);
+            throw new Exception("file_get_contents() on URL return empty: ".$url);
         }
 
         return static::loadFromData($content);
@@ -82,28 +86,25 @@ class Img
     public static function loadFromData(string $data)
     {
         # create imagick
-        $imagick = new Imagick();
-        $imagick->readImageBlob($data);
-       
-        # check imagick is ok
-        if (!$imagick) {
+        if ($image = new static()) {
+            throw new Exception("create imagick instance failed");
+        }
+
+        if (!$image->readImageBlob($data)) {
             throw new Exception("invalid base64 imagick");
         }
 
         # get and check extension
-        if (!in_array(strtolower($imagick->getImageFormat()), static::$allowed_extensions)) {
-            throw new Exception("extension is not image: ".strtolower($imagick->getImageFormat()));
+        if (!in_array($image->getExtension(), static::$allowed_extensions)) {
+            throw new Exception("extension is not image: ".$image->getExtension());
         }
 
         # check mime type
-        if (!in_array($imagick->getImageMimeType(), static::$allowed_mime)) {
-            throw new Exception("mime type is not image: ".$imagick->getImageMimeType());
+        if (!in_array($image->getMimeType(), static::$allowed_mime)) {
+            throw new Exception("mime type is not image: ".$image->getMimeType());
         }
 
-        # return img object
-        $img = new static();
-        $img->_imagick = $imagick;
-        return $img;
+        return $image;
     }
 
 
@@ -116,86 +117,69 @@ class Img
 
     public function getExtension()
     {
-        return $this->_imagick ? strtolower($this->_imagick->getImageFormat()) : null;
+        return strtolower($this->getImageFormat());
     }
 
 
-    public function getSize()
+    public function getMimeType()
     {
-        return $this->_imagick ? $this->_imagick->getImageLength() : null;
+        return $this->getImageMimeType();
+    }
+
+
+    public function getLength()
+    {
+        return $this->getImageLength();
     }
 
 
     public function getName()
     {
-        return $this->_imagick ? basename($this->_imagick->getImageFilename()) : null;
+        return basename($this->getImageFilename());
     }
 
 
     public function getWidth()
     {
-        return $this->_imagick ? $this->_imagick->getImageWidth() : null;
+        return $this->getImageWidth();
     }
 
 
     public function getHeight()
     {
-        return $this->_imagick ? $this->_imagick->getImageHeight() : null;
+        return $this->getImageHeight();
     }
 
 
     public function display()
     {
-        if ($this->_imagick) {
-            header("Content-Type: ".$this->_imagick->getImageMimeType());
-            echo $this->_imagick->getImageBlob();
+        header("Content-Type: ".$this->getMimeType());
+        echo $this->getImageBlob();
+    }
+
+
+    public function save(string $filepathname)
+    {
+        if (!$filepath = dirname($filepathname)) {
+            throw new Exception('filepath directory is empty: '.$filepath);
         }
-    }
-
-
-    public function getUrl()
-    {
-        return str_replace(DOC_ROOT.DIR_ROOT, '/', $this->path);
-    }
-
-
-    public function upload(string $filepathname, int $width = null, int $height = null, bool $crop = true)
-    {
-        # check imagick
-        if (!$this->_imagick) {
-            return false;
+        
+        if (!is_dir($filepath)) {
+            throw new Exception('filepath directory is not a directory: '.$filepath);
         }
 
         # check filepath exists or try to create it
-        $filepath = dirname($filepathname);
-        if(!is_dir($filepath) && !mkdir($filepath, 0755, true)) {
+        if(!mkdir($filepath, 0755, true)) {
             return false;
         }
 
-        # check width / height
-        $width = $width ? $width : $this->getWidth();
-        $height = $height ? $height : $this->getHeight();
-        if (!$width || !$height) {
-            return $this->_imagick->writeImage($filepathname);
-        }
-
-        # if crop, try to crop
-        if ($crop && !$this->crop($width, $height)) {
-            return false;
-        }
-
-        # if not crop, try to resize
-        if (!$crop && !$this->resize($width, $height)) {
-            return false;
-        }
-
-        return $this->_imagick->writeImage($filepathname);
+        return $this->writeImage($filepathname);
     }
 
 
     public function resize(int $width, int $height)
     {
-        return $this->_imagick->resizeImage($width, $height, 0, 1, false);
+        return $this->resizeImage($width, $height, 0, 1, false);
     }
 
 
@@ -203,7 +187,7 @@ class Img
     {
         $offset_x = $this->getWidth() / $width;
         $offset_y = $this->getHeight() / $height;
-        $offset_x <= $offset_y ? $this->_imagick->resizeImage($width, 0, 0, 1) : $this->_imagick->resizeImage(0, $height, 0, 1);
-        return $this->_imagick->cropImage($width, $height, (int)(abs($this->getWidth() - $width) / 2), (int)(abs($this->getHeight() - $height) / 2));
+        $offset_x <= $offset_y ? $this->resizeImage($width, 0, 0, 1) : $this->resizeImage(0, $height, 0, 1);
+        return $this->cropImage($width, $height, (int)(abs($this->getWidth() - $width) / 2), (int)(abs($this->getHeight() - $height) / 2));
     }
 }
