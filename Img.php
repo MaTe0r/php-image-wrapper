@@ -183,6 +183,12 @@ class Img extends Imagick
 
     public function crop(int $width = 0, int $height = 0)
     {
+        if ($this->getImageOrientation() !== 0) {
+            $tmp = $width;
+            $width = $height;
+            $height = $tmp;
+        }
+        
         $offset_x = $this->getWidth() / $width;
         $offset_y = $this->getHeight() / $height;
         $offset_x <= $offset_y ? $this->resizeImage($width, 0, 0, 1) : $this->resizeImage(0, $height, 0, 1);
